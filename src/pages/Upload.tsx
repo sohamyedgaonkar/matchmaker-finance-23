@@ -38,7 +38,7 @@ const Upload = () => {
     // Here you would typically upload the files to your backend
     // For now, we'll just simulate the process
     setTimeout(() => {
-      window.location.href = "/results";
+      window.location.href = "/match";
     }, 2000);
   };
 
