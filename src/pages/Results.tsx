@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,55 +10,28 @@ import Navigation from "@/components/Navigation";
 
 const Results = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [matchedRecords, setMatchedRecords] = useState<Array<{
+    id: number;
+    companyRef: string;
+    partyRef: string;
+    amount: number;
+    date: string;
+    status: "matched" | "potential" | "unmatched";
+    confidence: number;
+  }>>([]);
+  
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  // Mock data - in a real app, this would come from your backend
-  const matchedRecords = [
-    {
-      id: 1,
-      companyRef: "TXN001",
-      partyRef: "PAY001", 
-      amount: 15000.00,
-      date: "2024-01-15",
-      status: "matched",
-      confidence: 100
-    },
-    {
-      id: 2,
-      companyRef: "TXN002",
-      partyRef: "PAY002",
-      amount: 8500.50,
-      date: "2024-01-16", 
-      status: "matched",
-      confidence: 95
-    },
-    {
-      id: 3,
-      companyRef: "TXN003",
-      partyRef: "PAY003",
-      amount: 12000.00,
-      date: "2024-01-17",
-      status: "potential",
-      confidence: 78
-    },
-    {
-      id: 4,
-      companyRef: "TXN004",
-      partyRef: "-",
-      amount: 3200.00,
-      date: "2024-01-18",
-      status: "unmatched",
-      confidence: 0
-    },
-    {
-      id: 5,
-      companyRef: "TXN005", 
-      partyRef: "PAY005",
-      amount: 25000.00,
-      date: "2024-01-19",
-      status: "matched",
-      confidence: 100
+  useEffect(() => {
+    const records = location.state?.matchedRecords;
+    if (records) {
+      setMatchedRecords(records);
+    } else {
+      // Redirect to upload if no data
+      navigate("/upload");
     }
-  ];
+  }, [location.state, navigate]);
 
   const filteredRecords = matchedRecords.filter(record =>
     record.companyRef.toLowerCase().includes(searchTerm.toLowerCase()) ||

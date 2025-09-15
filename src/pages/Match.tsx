@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,7 @@ const Match = () => {
   const [selectedCompany, setSelectedCompany] = useState<number | null>(null);
   const [selectedParty, setSelectedParty] = useState<number | null>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleMatch = () => {
     if (selectedCompany && selectedParty) {
@@ -72,17 +74,44 @@ const Match = () => {
       return;
     }
 
-    // Store matches in sessionStorage to pass to results page
-    sessionStorage.setItem('reconciliationMatches', JSON.stringify({
-      matches,
-      companyData,
-      partyData,
-      totalCompanyRecords: companyData.length,
-      totalPartyRecords: partyData.length,
-      matchedRecords: matches.length
-    }));
+    // Transform matches into the format expected by Results page
+    const matchedRecords = matches.map((match, index) => {
+      const companyRecord = companyData.find(r => r.id === match.companyId);
+      const partyRecord = partyData.find(r => r.id === match.partyId);
+      return {
+        id: index + 1,
+        companyRef: companyRecord?.reference || "",
+        partyRef: partyRecord?.reference || "",
+        amount: companyRecord?.amount || 0,
+        date: companyRecord?.date || "",
+        status: "matched" as const,
+        confidence: 100
+      };
+    });
 
-    window.location.href = "/results";
+    // Add unmatched company records
+    const unmatchedCompanyRecords = companyData
+      .filter(record => !matches.some(m => m.companyId === record.id))
+      .map((record, index) => ({
+        id: matchedRecords.length + index + 1,
+        companyRef: record.reference,
+        partyRef: "-",
+        amount: record.amount,
+        date: record.date,
+        status: "unmatched" as const,
+        confidence: 0
+      }));
+
+    const allRecords = [...matchedRecords, ...unmatchedCompanyRecords];
+
+    toast({
+      title: "Matching Complete",
+      description: "Redirecting to results...",
+    });
+
+    setTimeout(() => {
+      navigate("/results", { state: { matchedRecords: allRecords } });
+    }, 1000);
   };
 
   const isRecordMatched = (type: 'company' | 'party', id: number) => {
