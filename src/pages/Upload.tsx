@@ -6,21 +6,55 @@ import { Label } from "@/components/ui/label";
 import { Upload as UploadIcon, FileSpreadsheet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/Navigation";
+import Papa from "papaparse";
+import * as XLSX from "xlsx";
+import { useNavigate } from "react-router-dom";
 
 const Upload = () => {
   const [companyFile, setCompanyFile] = useState<File | null>(null);
   const [partyFile, setPartyFile] = useState<File | null>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
-  const handleFileChange = (type: 'company' | 'party', file: File | null) => {
-    if (type === 'company') {
+  // Utility to parse CSV/XLSX into JSON
+  const parseFile = (file: File): Promise<any[]> => {
+    return new Promise((resolve, reject) => {
+      const ext = file.name.split(".").pop()?.toLowerCase();
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        const data = e.target?.result;
+        if (!data) return reject("No data");
+
+        if (ext === "csv") {
+          Papa.parse(data as string, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (results) => resolve(results.data),
+            error: (err) => reject(err),
+          });
+        } else {
+          const wb = XLSX.read(data, { type: "binary" });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const json = XLSX.utils.sheet_to_json(ws);
+          resolve(json);
+        }
+      };
+
+      if (ext === "csv") reader.readAsText(file);
+      else reader.readAsBinaryString(file);
+    });
+  };
+
+  const handleFileChange = (type: "company" | "party", file: File | null) => {
+    if (type === "company") {
       setCompanyFile(file);
     } else {
       setPartyFile(file);
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!companyFile || !partyFile) {
       toast({
         title: "Missing Files",
@@ -30,16 +64,27 @@ const Upload = () => {
       return;
     }
 
-    toast({
-      title: "Files Uploaded Successfully",
-      description: "Your files are being processed for reconciliation.",
-    });
+    try {
+      const [companyData, partyData] = await Promise.all([
+        parseFile(companyFile),
+        parseFile(partyFile),
+      ]);
 
-    // Here you would typically upload the files to your backend
-    // For now, we'll just simulate the process
-    setTimeout(() => {
-      window.location.href = "/match";
-    }, 2000);
+      toast({
+        title: "Files Uploaded Successfully",
+        description: "Your files are being processed for reconciliation.",
+      });
+
+      setTimeout(() => {
+        navigate("/match", { state: { companyData, partyData } });
+      }, 1000);
+    } catch (err) {
+      toast({
+        title: "Error Parsing Files",
+        description: String(err),
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -57,7 +102,7 @@ const Upload = () => {
           </div>
 
           <div className="grid md:grid-cols-2 gap-8">
-            {/* Company Data Upload */}
+            {/* Company Upload */}
             <Card className="shadow-card">
               <CardHeader className="text-center pb-4">
                 <div className="w-16 h-16 bg-finance-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -65,33 +110,27 @@ const Upload = () => {
                 </div>
                 <CardTitle className="text-2xl">Company Data</CardTitle>
                 <CardDescription>
-                  Upload your company's financial records and transaction data
+                  Upload your company's financial records
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="company-file">Select Company File</Label>
-                  <div className="relative">
-                    <Input
-                      id="company-file"
-                      type="file"
-                      accept=".csv,.xlsx,.xls"
-                      onChange={(e) => handleFileChange('company', e.target.files?.[0] || null)}
-                      className="file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-finance-secondary file:text-finance-primary"
-                    />
-                  </div>
-                </div>
+                <Label htmlFor="company-file">Select Company File</Label>
+                <Input
+                  id="company-file"
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  onChange={(e) => handleFileChange("company", e.target.files?.[0] || null)}
+                  className="file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-finance-secondary file:text-finance-primary"
+                />
                 {companyFile && (
                   <div className="p-3 bg-finance-success/10 rounded-lg border border-finance-success/20">
-                    <p className="text-sm text-finance-success font-medium">
-                      ✓ {companyFile.name} uploaded successfully
-                    </p>
+                    ✓ {companyFile.name} uploaded successfully
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Party Data Upload */}
+            {/* Party Upload */}
             <Card className="shadow-card">
               <CardHeader className="text-center pb-4">
                 <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -99,27 +138,21 @@ const Upload = () => {
                 </div>
                 <CardTitle className="text-2xl">Party Data</CardTitle>
                 <CardDescription>
-                  Upload the third-party or counterparty transaction records
+                  Upload counterparty transaction records
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="party-file">Select Party File</Label>
-                  <div className="relative">
-                    <Input
-                      id="party-file"
-                      type="file"
-                      accept=".csv,.xlsx,.xls"
-                      onChange={(e) => handleFileChange('party', e.target.files?.[0] || null)}
-                      className="file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-finance-secondary file:text-finance-primary"
-                    />
-                  </div>
-                </div>
+                <Label htmlFor="party-file">Select Party File</Label>
+                <Input
+                  id="party-file"
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  onChange={(e) => handleFileChange("party", e.target.files?.[0] || null)}
+                  className="file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-finance-secondary file:text-finance-primary"
+                />
                 {partyFile && (
                   <div className="p-3 bg-finance-success/10 rounded-lg border border-finance-success/20">
-                    <p className="text-sm text-finance-success font-medium">
-                      ✓ {partyFile.name} uploaded successfully
-                    </p>
+                    ✓ {partyFile.name} uploaded successfully
                   </div>
                 )}
               </CardContent>
@@ -137,15 +170,6 @@ const Upload = () => {
               <UploadIcon className="w-5 h-5 mr-2" />
               Process Data for Reconciliation
             </Button>
-          </div>
-
-          {/* Help Text */}
-          <div className="bg-muted/50 rounded-lg p-6 text-center">
-            <h3 className="font-semibold mb-2">Supported File Formats</h3>
-            <p className="text-sm text-muted-foreground">
-              CSV, Excel (.xlsx, .xls). Maximum file size: 50MB. 
-              Ensure your files contain transaction dates, amounts, and reference numbers for optimal matching.
-            </p>
           </div>
         </div>
       </main>
