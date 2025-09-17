@@ -51,26 +51,45 @@ const Match = () => {
 }));
 
   const [matches, setMatches] = useState<Match[]>([]);
-  const [selectedCompany, setSelectedCompany] = useState<number | null>(null);
-  const [selectedParty, setSelectedParty] = useState<number | null>(null);
+  const [selectedCompanyIds, setSelectedCompanyIds] = useState<number[]>([]);
+  const [selectedPartyIds, setSelectedPartyIds] = useState<number[]>([]);
 
   const handleMatch = () => {
-    if (selectedCompany && selectedParty) {
-      const existingMatch = matches.find(
-        (m) => m.companyId === selectedCompany || m.partyId === selectedParty
+    if (selectedCompanyIds.length > 0 && selectedPartyIds.length > 0) {
+      // Check if any selected records are already matched
+      const conflictingMatches = matches.filter(
+        (m) => selectedCompanyIds.includes(m.companyId) || selectedPartyIds.includes(m.partyId)
       );
-      if (existingMatch) {
+      
+      if (conflictingMatches.length > 0) {
         toast({
           title: "Already Matched",
-          description: "One of the selected records is already matched.",
+          description: "Some of the selected records are already matched.",
           variant: "destructive",
         });
         return;
       }
-      setMatches([...matches, { companyId: selectedCompany, partyId: selectedParty }]);
-      setSelectedCompany(null);
-      setSelectedParty(null);
-      toast({ title: "Match Created", description: "Records have been successfully matched." });
+
+      // Create matches by pairing selected records in order
+      const newMatches: Match[] = [];
+      const maxLength = Math.min(selectedCompanyIds.length, selectedPartyIds.length);
+      
+      for (let i = 0; i < maxLength; i++) {
+        newMatches.push({
+          companyId: selectedCompanyIds[i],
+          partyId: selectedPartyIds[i],
+        });
+      }
+
+      setMatches([...matches, ...newMatches]);
+      setSelectedCompanyIds([]);
+      setSelectedPartyIds([]);
+      
+      const matchCount = newMatches.length;
+      toast({ 
+        title: "Matches Created", 
+        description: `${matchCount} record${matchCount > 1 ? 's' : ''} have been successfully matched.` 
+      });
     }
   };
 
@@ -132,7 +151,7 @@ const Match = () => {
           <div className="text-center space-y-4">
             <h1 className="text-4xl font-bold text-foreground">Manual Reconciliation</h1>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Review your data and manually match corresponding records between company and party datasets.
+              Review your data and manually match corresponding records between company and party datasets. Click to select multiple records on each side, then create matches.
             </p>
           </div>
 
@@ -162,19 +181,34 @@ const Match = () => {
           <div className="grid lg:grid-cols-2 gap-6">
             {/* Company List */}
             <Card>
-              <CardHeader><CardTitle>Company Data</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle className="flex justify-between items-center">
+                  Company Data
+                  {selectedCompanyIds.length > 0 && (
+                    <Badge variant="secondary">{selectedCompanyIds.length} selected</Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
               <CardContent className="space-y-3 max-h-96 overflow-y-auto">
                 {companyData.map((record) => (
                   <div
                     key={record.id}
                     className={`p-4 border rounded-lg cursor-pointer ${
                       isRecordMatched("company", record.id)
-                        ? "bg-finance-success/10"
-                        : selectedCompany === record.id
-                        ? "bg-finance-primary/10"
+                        ? "bg-finance-success/10 border-finance-success"
+                        : selectedCompanyIds.includes(record.id)
+                        ? "bg-finance-primary/10 border-finance-primary"
                         : "hover:bg-muted/50"
                     }`}
-                    onClick={() => !isRecordMatched("company", record.id) && setSelectedCompany(record.id)}
+                    onClick={() => {
+                      if (!isRecordMatched("company", record.id)) {
+                        setSelectedCompanyIds(prev => 
+                          prev.includes(record.id) 
+                            ? prev.filter(id => id !== record.id)
+                            : [...prev, record.id]
+                        );
+                      }
+                    }}
                   >
                     <div className="flex justify-between">
                       <div>
@@ -191,19 +225,34 @@ const Match = () => {
 
             {/* Party List */}
             <Card>
-              <CardHeader><CardTitle>Party Data</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle className="flex justify-between items-center">
+                  Party Data
+                  {selectedPartyIds.length > 0 && (
+                    <Badge variant="secondary">{selectedPartyIds.length} selected</Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
               <CardContent className="space-y-3 max-h-96 overflow-y-auto">
                 {partyData.map((record) => (
                   <div
                     key={record.id}
                     className={`p-4 border rounded-lg cursor-pointer ${
                       isRecordMatched("party", record.id)
-                        ? "bg-finance-success/10"
-                        : selectedParty === record.id
-                        ? "bg-accent/10"
+                        ? "bg-finance-success/10 border-finance-success"
+                        : selectedPartyIds.includes(record.id)
+                        ? "bg-accent/10 border-accent"
                         : "hover:bg-muted/50"
                     }`}
-                    onClick={() => !isRecordMatched("party", record.id) && setSelectedParty(record.id)}
+                    onClick={() => {
+                      if (!isRecordMatched("party", record.id)) {
+                        setSelectedPartyIds(prev => 
+                          prev.includes(record.id) 
+                            ? prev.filter(id => id !== record.id)
+                            : [...prev, record.id]
+                        );
+                      }
+                    }}
                   >
                     <div className="flex justify-between">
                       <div>
@@ -221,7 +270,7 @@ const Match = () => {
 
           {/* Match Controls */}
           <div className="text-center">
-            <Button onClick={handleMatch} disabled={!selectedCompany || !selectedParty}>
+            <Button onClick={handleMatch} disabled={selectedCompanyIds.length === 0 || selectedPartyIds.length === 0}>
               <ArrowRight className="w-4 h-4 mr-2" />
               Create Match
             </Button>
