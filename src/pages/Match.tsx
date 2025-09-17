@@ -17,8 +17,8 @@ type RecordType = {
 };
 
 type Match = {
-  companyId: number;
-  partyId: number;
+  companyIds: number[];
+  partyIds: number[];
 };
 
 const Match = () => {
@@ -58,7 +58,8 @@ const Match = () => {
     if (selectedCompanyIds.length > 0 && selectedPartyIds.length > 0) {
       // Check if any selected records are already matched
       const conflictingMatches = matches.filter(
-        (m) => selectedCompanyIds.includes(m.companyId) || selectedPartyIds.includes(m.partyId)
+        (m) => selectedCompanyIds.some(id => m.companyIds.includes(id)) || 
+               selectedPartyIds.some(id => m.partyIds.includes(id))
       );
       
       if (conflictingMatches.length > 0) {
@@ -70,25 +71,19 @@ const Match = () => {
         return;
       }
 
-      // Create matches by pairing selected records in order
-      const newMatches: Match[] = [];
-      const maxLength = Math.min(selectedCompanyIds.length, selectedPartyIds.length);
-      
-      for (let i = 0; i < maxLength; i++) {
-        newMatches.push({
-          companyId: selectedCompanyIds[i],
-          partyId: selectedPartyIds[i],
-        });
-      }
+      // Create a single grouped match with all selected records
+      const newMatch: Match = {
+        companyIds: [...selectedCompanyIds],
+        partyIds: [...selectedPartyIds],
+      };
 
-      setMatches([...matches, ...newMatches]);
+      setMatches([...matches, newMatch]);
       setSelectedCompanyIds([]);
       setSelectedPartyIds([]);
       
-      const matchCount = newMatches.length;
       toast({ 
-        title: "Matches Created", 
-        description: `${matchCount} record${matchCount > 1 ? 's' : ''} have been successfully matched.` 
+        title: "Match Created", 
+        description: `Grouped ${selectedCompanyIds.length} company record${selectedCompanyIds.length > 1 ? 's' : ''} with ${selectedPartyIds.length} party record${selectedPartyIds.length > 1 ? 's' : ''}.` 
       });
     }
   };
@@ -104,25 +99,26 @@ const Match = () => {
     }
 
     const matchedRecords = matches.map((match, index) => {
-      const companyRecord = companyData.find((r) => r.id === match.companyId);
-      const partyRecord = partyData.find((r) => r.id === match.partyId);
+      const companyRecords = companyData.filter((r) => match.companyIds.includes(r.id));
+      const partyRecords = partyData.filter((r) => match.partyIds.includes(r.id));
+      
       return {
         id: index + 1,
-        companyRef: companyRecord?.reference || "",
-        partyRef: partyRecord?.reference || "",
-        amount: companyRecord?.amount || 0,
-        date: companyRecord?.date || "",
+        companyRefs: companyRecords.map(r => r.reference),
+        partyRefs: partyRecords.map(r => r.reference),
+        amount: companyRecords.reduce((sum, r) => sum + (r.amount || 0), 0),
+        date: companyRecords[0]?.date || "",
         status: "matched" as const,
         confidence: 100,
       };
     });
 
     const unmatchedCompanyRecords = companyData
-      .filter((r) => !matches.some((m) => m.companyId === r.id))
+      .filter((r) => !matches.some((m) => m.companyIds.includes(r.id)))
       .map((record, idx) => ({
         id: matchedRecords.length + idx + 1,
-        companyRef: record.reference,
-        partyRef: "-",
+        companyRefs: [record.reference],
+        partyRefs: ["-"],
         amount: record.amount,
         date: record.date,
         status: "unmatched" as const,
@@ -139,7 +135,11 @@ const Match = () => {
   };
 
   const isRecordMatched = (type: "company" | "party", id: number) => {
-    return matches.some((m) => (type === "company" ? m.companyId === id : m.partyId === id));
+    return matches.some((m) => 
+      type === "company" 
+        ? m.companyIds.includes(id) 
+        : m.partyIds.includes(id)
+    );
   };
 
   return (

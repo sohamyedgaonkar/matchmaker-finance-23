@@ -12,8 +12,8 @@ const Results = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [matchedRecords, setMatchedRecords] = useState<Array<{
     id: number;
-    companyRef: string;
-    partyRef: string;
+    companyRefs: string[];
+    partyRefs: string[];
     amount: number;
     date: string;
     status: "matched" | "potential" | "unmatched";
@@ -34,8 +34,8 @@ const Results = () => {
   }, [location.state, navigate]);
 
   const filteredRecords = matchedRecords.filter(record =>
-    record.companyRef.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.partyRef.toLowerCase().includes(searchTerm.toLowerCase())
+    record.companyRefs.some(ref => ref.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    record.partyRefs.some(ref => ref.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const getStatusBadge = (status: string, confidence: number) => {
@@ -146,8 +146,8 @@ const Results = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Company Ref</TableHead>
-                    <TableHead>Party Ref</TableHead>
+                    <TableHead>Company References</TableHead>
+                    <TableHead>Party References</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Status</TableHead>
@@ -156,8 +156,20 @@ const Results = () => {
                 <TableBody>
                   {filteredRecords.map((record) => (
                     <TableRow key={record.id}>
-                      <TableCell className="font-medium">{record.companyRef}</TableCell>
-                      <TableCell>{record.partyRef}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="space-y-1">
+                          {record.companyRefs.map((ref, idx) => (
+                            <div key={idx} className="text-sm">{ref}</div>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          {record.partyRefs.map((ref, idx) => (
+                            <div key={idx} className="text-sm">{ref}</div>
+                          ))}
+                        </div>
+                      </TableCell>
                       <TableCell>${record.amount.toLocaleString()}</TableCell>
                       <TableCell>{record.date}</TableCell>
                       <TableCell>{getStatusBadge(record.status, record.confidence)}</TableCell>
